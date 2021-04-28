@@ -10,6 +10,8 @@ edition = "2018"
 druid = { git = "https://github.com/linebender/druid.git"}
 druid-shell = { git = "https://github.com/linebender/druid.git"}
 
+serde = "1.0"
+serde_json = "1.0"
 
 [dependencies.xi-core-lib]
 branch = "master"

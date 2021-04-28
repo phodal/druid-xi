@@ -15,12 +15,30 @@
 //! This is a very small example of how to setup a druid application.
 //! It does the almost bare minimum while still being useful.
 
+pub mod xi_thread;
+pub mod rpc;
+
+
+extern crate serde;
+#[macro_use]
+extern crate serde_json;
+
+
 use druid::widget::prelude::*;
 use druid::widget::{Flex, Label, TextBox};
 use druid::{AppLauncher, Data, Lens, UnitPoint, WidgetExt, WindowDesc};
+use crate::xi_thread::start_xi_thread;
+use crate::rpc::{Handler, Core};
+use std::sync::{Mutex, Arc};
+use druid_shell::IdleHandle;
+use serde_json::Value;
+use std::collections::HashMap;
+use std::rc::Weak;
 
 const VERTICAL_WIDGET_SPACING: f64 = 20.0;
 const TEXT_BOX_WIDTH: f64 = 200.0;
+
+pub type Id = usize;
 
 #[derive(Clone, Data, Lens)]
 struct HelloState {
@@ -53,8 +71,156 @@ fn build_root_widget() -> impl Widget<HelloState> {
         .align_vertical(UnitPoint::CENTER)
 }
 
+type ViewId = String;
+
+/// The commands the EditView widget accepts through `poke`.
+pub enum EditViewCommands {
+    ViewId(String),
+    ApplyUpdate(Value),
+    ScrollTo(usize),
+    Core(Weak<Mutex<Core>>),
+    Undo,
+    Redo,
+    UpperCase,
+    LowerCase,
+    Transpose,
+    AddCursorAbove,
+    AddCursorBelow,
+    SingleSelection,
+    SelectAll,
+}
+
+
+#[derive(Clone)]
+struct ViewState {
+    id: Id,
+    filename: Option<String>,
+    handle: IdleHandle,
+}
+
+#[derive(Clone)]
+struct AppState {
+    focused: Option<ViewId>,
+    views: HashMap<ViewId, ViewState>,
+}
+
+impl AppState {
+    fn new() -> AppState {
+        AppState {
+            focused: Default::default(),
+            views: HashMap::new(),
+        }
+    }
+
+    fn get_focused(&self) -> String {
+        self.focused.clone().expect("no focused viewstate")
+    }
+
+    fn get_focused_viewstate(&mut self) -> &mut ViewState {
+        let view_id = self.focused.clone().expect("no focused viewstate");
+        self.views.get_mut(&view_id).expect("Focused viewstate not found in views")
+    }
+}
+
+#[derive(Clone)]
+struct App {
+    core: Arc<Mutex<Core>>,
+    state: Arc<Mutex<AppState>>,
+}
+
+impl App {
+    fn new(core: Core) -> App {
+        App {
+            core: Arc::new(Mutex::new(core)),
+            state: Arc::new(Mutex::new(AppState::new())),
+        }
+    }
+
+    fn send_notification(&self, method: &str, params: &Value) {
+        self.get_core().send_notification(method, params);
+    }
+
+    fn send_view_cmd(&self, cmd: EditViewCommands) {
+        let mut state = self.get_state();
+        let focused = state.get_focused_viewstate();
+    }
+}
+
+impl App {
+    fn get_core(&self) -> std::sync::MutexGuard<'_, rpc::Core, > {
+        self.core.lock().unwrap()
+    }
+
+    fn get_state(&self) -> std::sync::MutexGuard<'_, AppState, > {
+        self.state.lock().unwrap()
+    }
+}
+
+impl App {
+    fn req_new_view(&self, filename: Option<&str>, handle: IdleHandle) {
+        let mut params = json!({});
+
+        let filename = if filename.is_some() {
+            params["file_path"] = json!(filename.unwrap());
+            Some(filename.unwrap().to_string())
+        } else {
+            None
+        };
+
+        let edit_view = 0;
+        let core = Arc::downgrade(&self.core);
+        let state = self.state.clone();
+    }
+
+    fn handle_cmd(&self, method: &str, params: &Value) {
+        match method {
+            "update" => (),
+            "scroll_to" => (),
+            "available_themes" => (), // TODO
+            "available_plugins" => (), // TODO
+            "available_languages" => (), // TODO
+            "config_changed" => (), // TODO
+            "language_changed" => (), // TODO
+            _ => println!("unhandled core->fe method {}", method),
+        }
+    }
+}
+
+#[derive(Clone)]
+struct AppDispatcher {
+    app: Arc<Mutex<Option<App>>>,
+}
+
+impl AppDispatcher {
+    fn new() -> AppDispatcher {
+        AppDispatcher {
+            app: Default::default(),
+        }
+    }
+
+    fn set_app(&self, app: &App) {
+        *self.app.lock().unwrap() = Some(app.clone());
+    }
+
+    fn set_menu_listeners(&self) {
+        let app = self.app.clone();
+    }
+}
+
+
+impl Handler for AppDispatcher {
+    fn notification(&self, method: &str, params: &Value) {
+        // NOTE: For debugging, could be replaced by trace logging
+        // println!("core->fe: {} {}", method, params);
+        if let Some(ref app) = *self.app.lock().unwrap() {
+            app.handle_cmd(method, params);
+        }
+    }
+}
+
 pub fn main() {
-    // describe the main window
+    let (xi_peer, rx) = start_xi_thread();
+
     let main_window = WindowDesc::new(build_root_widget())
         .title("Hello World!")
         .window_size((400.0, 400.0));
