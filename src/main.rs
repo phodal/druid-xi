@@ -1,39 +1,25 @@
-// Copyright 2019 The Druid Authors.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
-//! This is a very small example of how to setup a druid application.
-//! It does the almost bare minimum while still being useful.
-
-pub mod xi_thread;
-pub mod rpc;
-
-
+#[macro_use]
+extern crate log;
 extern crate serde;
 #[macro_use]
 extern crate serde_json;
 
-
-use druid::widget::prelude::*;
-use druid::widget::{Flex, Label, TextBox};
-use druid::{AppLauncher, Data, Lens, UnitPoint, WidgetExt, WindowDesc};
-use crate::xi_thread::start_xi_thread;
-use crate::rpc::{Handler, Core};
-use std::sync::{Mutex, Arc};
-use druid_shell::IdleHandle;
-use serde_json::Value;
 use std::collections::HashMap;
 use std::rc::Weak;
+use std::sync::{Arc, Mutex};
+
+use druid::{AppLauncher, Data, Lens, UnitPoint, WidgetExt, WindowDesc};
+use druid::widget::{Flex, Label, TextBox};
+use druid::widget::prelude::*;
+use druid_shell::IdleHandle;
+use serde_json::Value;
+
+use crate::rpc::{Core, Handler};
+use crate::xi_thread::start_xi_thread;
+
+pub mod xi_thread;
+pub mod rpc;
+
 
 const VERTICAL_WIDGET_SPACING: f64 = 20.0;
 const TEXT_BOX_WIDTH: f64 = 200.0;
@@ -157,7 +143,7 @@ impl App {
 }
 
 impl App {
-    fn req_new_view(&self, filename: Option<&str>, handle: IdleHandle) {
+    fn req_new_view(&self, filename: Option<&str>) {
         let mut params = json!({});
 
         let filename = if filename.is_some() {
@@ -219,6 +205,11 @@ impl Handler for AppDispatcher {
 }
 
 pub fn main() {
+    xi_trace::enable_tracing();
+    if xi_trace::is_enabled() {
+        info!("tracing started")
+    }
+
     let (xi_peer, rx) = start_xi_thread();
 
     let main_window = WindowDesc::new(build_root_widget())
@@ -229,6 +220,15 @@ pub fn main() {
     let initial_state: HelloState = HelloState {
         name: "World".into(),
     };
+
+    let handler = AppDispatcher::new();
+    handler.set_menu_listeners();
+
+    let core = Core::new(xi_peer, rx, handler.clone());
+    let app = App::new(core);
+    app.send_notification("client_started", &json!({}));
+
+    app.req_new_view(None);
 
     // start the application. Here we pass in the application state.
     AppLauncher::with_window(main_window)

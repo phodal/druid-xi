@@ -455,6 +455,7 @@ version = "0.1.0"
 dependencies = [
  "druid",
  "druid-shell",
+ "log",
  "serde",
  "serde_json",
  "xi-core-lib",
