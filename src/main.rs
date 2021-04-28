@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::rc::Weak;
 use std::sync::{Arc, Mutex};
 
-use druid::{AppLauncher, Data, Lens, UnitPoint, WidgetExt, WindowDesc};
+use druid::{AppLauncher, Data, Lens, UnitPoint, WidgetExt, WindowDesc, AppDelegate, Target, Command, DelegateCtx, Handled, Selector};
 use druid::widget::{Flex, Label, TextBox};
 use druid::widget::prelude::*;
 use druid_shell::IdleHandle;
@@ -16,6 +16,8 @@ use serde_json::Value;
 
 use crate::rpc::{Core, Handler};
 use crate::xi_thread::start_xi_thread;
+use std::thread;
+use std::time::Duration;
 
 pub mod xi_thread;
 pub mod rpc;
@@ -77,11 +79,10 @@ pub enum EditViewCommands {
 }
 
 
-#[derive(Clone)]
+#[derive(Clone, Data)]
 struct ViewState {
     id: Id,
     filename: Option<String>,
-    handle: IdleHandle,
 }
 
 #[derive(Clone)]
@@ -196,11 +197,18 @@ impl AppDispatcher {
 
 impl Handler for AppDispatcher {
     fn notification(&self, method: &str, params: &Value) {
-        // NOTE: For debugging, could be replaced by trace logging
-        // println!("core->fe: {} {}", method, params);
         if let Some(ref app) = *self.app.lock().unwrap() {
             app.handle_cmd(method, params);
         }
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct Delegate;
+
+impl AppDelegate<ViewState> for Delegate {
+    fn command(&mut self, ctx: &mut DelegateCtx, target: Target, cmd: &Command, data: &mut ViewState, env: &Env) -> Handled {
+        Handled::Yes
     }
 }
 
@@ -216,7 +224,6 @@ pub fn main() {
         .title("Hello World!")
         .window_size((400.0, 400.0));
 
-    // create the initial app state
     let initial_state: HelloState = HelloState {
         name: "World".into(),
     };
@@ -230,8 +237,19 @@ pub fn main() {
 
     app.req_new_view(None);
 
-    // start the application. Here we pass in the application state.
-    AppLauncher::with_window(main_window)
+    let launcher = AppLauncher::with_window(main_window);
+    let handler = launcher.get_external_handle();
+
+
+    let _thread = thread::spawn(move || {
+        thread::sleep(Duration::from_secs(10));
+        println!("Sending Command");
+        handler
+            .submit_command(Selector::<()>::new("Test"), Box::new(()), Target::Auto)
+            .expect("Failed to send command");
+    });
+
+    launcher
         .log_to_console()
         .launch(initial_state)
         .expect("Failed to launch application");
