@@ -238,7 +238,6 @@ pub fn main() {
     let core = Core::new(xi_peer, rx, handler.clone());
     let app = App::new(core);
 
-
     let launcher = AppLauncher::with_window(main_window);
     let handler = launcher.get_external_handle();
 

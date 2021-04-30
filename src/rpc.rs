@@ -65,7 +65,7 @@ impl Core {
         let rx_core_handle = core.clone();
         thread::spawn(move || {
             while let Ok(msg) = rx.recv() {
-                info!("msg: {:?}", msg);
+                info!("Received message from xi: {:?}", msg);
                 if let Value::String(ref method) = msg["method"] {
                     handler.notification(&method, &msg["params"]);
                 } else if let Some(id) = msg["id"].as_u64() {
