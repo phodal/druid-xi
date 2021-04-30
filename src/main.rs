@@ -11,13 +11,11 @@ use std::sync::{Arc, Mutex};
 use druid::{AppLauncher, Data, Lens, UnitPoint, WidgetExt, WindowDesc, AppDelegate, Target, Command, DelegateCtx, Handled, Selector};
 use druid::widget::{Flex, Label, TextBox};
 use druid::widget::prelude::*;
-use druid_shell::IdleHandle;
 use serde_json::Value;
 
 use crate::rpc::{Core, Handler};
 use crate::xi_thread::start_xi_thread;
 use std::thread;
-use std::time::Duration;
 
 pub mod xi_thread;
 pub mod rpc;
@@ -213,10 +211,7 @@ impl AppDelegate<ViewState> for Delegate {
 }
 
 pub fn main() {
-    xi_trace::enable_tracing();
-    if xi_trace::is_enabled() {
-        info!("tracing started")
-    }
+    setup_log();
 
     let (xi_peer, rx) = start_xi_thread();
 
@@ -242,7 +237,6 @@ pub fn main() {
 
 
     let _thread = thread::spawn(move || {
-        thread::sleep(Duration::from_secs(10));
         println!("Sending Command");
         handler
             .submit_command(Selector::<()>::new("Test"), Box::new(()), Target::Auto)
@@ -250,7 +244,19 @@ pub fn main() {
     });
 
     launcher
-        .log_to_console()
         .launch(initial_state)
         .expect("Failed to launch application");
+}
+
+fn setup_log() {
+    use tracing_subscriber::prelude::*;
+    let filter_layer = tracing_subscriber::filter::LevelFilter::DEBUG;
+    let fmt_layer = tracing_subscriber::fmt::layer()
+        // Display target (eg "my_crate::some_mod::submod") with logs
+        .with_target(true);
+
+    tracing_subscriber::registry()
+        .with(filter_layer)
+        .with(fmt_layer)
+        .init();
 }
