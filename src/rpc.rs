@@ -74,10 +74,10 @@ impl Core {
                     if let Some(callback) = state.pending.remove(&id) {
                         callback.call(&msg["result"]);
                     } else {
-                        println!("unexpected result")
+                        info!("unexpected result")
                     }
                 } else {
-                    println!("got {:?} at rpc level", msg);
+                    info!("got {:?} at rpc level", msg);
                 }
             }
         });
@@ -89,6 +89,7 @@ impl Core {
             "method": method,
             "params": params,
         });
+        info!("{:?}", cmd.clone());
         let state = self.state.lock().unwrap();
         state.xi_peer.send_json(&cmd);
     }

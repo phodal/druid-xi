@@ -235,9 +235,7 @@ pub fn main() {
     let launcher = AppLauncher::with_window(main_window);
     let handler = launcher.get_external_handle();
 
-
     let _thread = thread::spawn(move || {
-        println!("Sending Command");
         handler
             .submit_command(Selector::<()>::new("Test"), Box::new(()), Target::Auto)
             .expect("Failed to send command");
