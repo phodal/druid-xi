@@ -13,7 +13,6 @@
 // limitations under the License.
 
 //! Front-end side implementation of RPC protocol.
-
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::Receiver;
@@ -66,7 +65,7 @@ impl Core {
         let rx_core_handle = core.clone();
         thread::spawn(move || {
             while let Ok(msg) = rx.recv() {
-                info!("{:?}", msg);
+                info!("msg: {:?}", msg);
                 if let Value::String(ref method) = msg["method"] {
                     handler.notification(&method, &msg["params"]);
                 } else if let Some(id) = msg["id"].as_u64() {
@@ -89,7 +88,7 @@ impl Core {
             "method": method,
             "params": params,
         });
-        info!("{:?}", cmd.clone());
+        info!("NOTIFICATION {:?}", cmd.clone());
         let state = self.state.lock().unwrap();
         state.xi_peer.send_json(&cmd);
     }
@@ -105,6 +104,7 @@ impl Core {
             "params": params,
             "id": id,
         });
+        info!("REQUEST {:?}", cmd.clone());
         state.xi_peer.send_json(&cmd);
         state.pending.insert(id, Box::new(callback));
         state.id += 1;

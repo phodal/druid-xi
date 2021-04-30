@@ -155,6 +155,15 @@ impl App {
         let edit_view = 0;
         let core = Arc::downgrade(&self.core);
         let state = self.state.clone();
+
+        self.core.lock().unwrap()
+            .send_request("new_view", &params,
+                          move |value| {
+                              let view_id = value.clone().as_str().unwrap().to_string();
+                              let mut state = state.lock().unwrap();
+                              state.focused = Some(view_id.clone());
+                          },
+            );
     }
 
     fn handle_cmd(&self, method: &str, params: &Value) {
@@ -228,12 +237,14 @@ pub fn main() {
 
     let core = Core::new(xi_peer, rx, handler.clone());
     let app = App::new(core);
-    app.send_notification("client_started", &json!({}));
 
-    app.req_new_view(None);
 
     let launcher = AppLauncher::with_window(main_window);
     let handler = launcher.get_external_handle();
+
+    app.send_notification("client_started", &json!({}));
+    app.req_new_view(None);
+    app.send_notification("set_theme", &json!({ "theme_name": "InspiredGitHub" }));
 
     let _thread = thread::spawn(move || {
         handler

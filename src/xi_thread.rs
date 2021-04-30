@@ -13,7 +13,6 @@
 // limitations under the License.
 
 //! Startup and communication with the xi core thread.
-
 use std::io::{self, BufRead, ErrorKind, Read, Write};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
